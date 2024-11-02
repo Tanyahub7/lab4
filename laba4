@@ -1,0 +1,69 @@
+import numpy as np
+import scipy.optimize as opt
+import matplotlib.pyplot as plt
+
+# Вхідні дані задачі
+expected_returns = np.array([0.10, 0.30, 0.45])  # Очікувані норми прибутку для кожної акції
+std_devs = np.array([0.0, 0.1, 0.15])           # Середньоквадратичні відхилення (рівень ризику) для кожної акції
+correlation_matrix = np.array([
+    [1, 0, 0],
+    [0, 1, -0.8],
+    [0, -0.8, 1]
+])
+
+# Обчислення ковариаційної матриці на основі стандартних відхилень і коефіцієнтів кореляції
+cov_matrix = np.outer(std_devs, std_devs) * correlation_matrix
+
+# Функція для розрахунку очікуваної норми прибутку портфеля
+def portfolio_return(weights):
+    return np.dot(weights, expected_returns)
+
+# Функція для розрахунку ризику (стандартного відхилення) портфеля
+def portfolio_volatility(weights):
+    return np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
+
+# Обмеження на суми ваг портфеля (всі ваги повинні в сумі дорівнювати 1)
+constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - 1})
+
+# Обмеження на ваги (вони повинні бути в межах від 0 до 1)
+bounds = [(0, 1) for _ in expected_returns]
+
+# Функція для мінімізації ризику
+def min_risk(weights):
+    return portfolio_volatility(weights)
+
+# Оптимізація для мінімального ризику з умовою, що сума ваг = 1
+result = opt.minimize(min_risk, [1/3, 1/3, 1/3], bounds=bounds, constraints=constraints)
+
+# Виведення результатів оптимізації для мінімального ризику
+if result.success:
+    min_risk_weights = result.x
+    print("Вага акцій в портфелі з мінімальним ризиком:", min_risk_weights)
+    print("Очікувана норма прибутку портфеля:", portfolio_return(min_risk_weights))
+    print("Ризик (стандартне відхилення) портфеля:", portfolio_volatility(min_risk_weights))
+else:
+    print("Оптимізація не вдалася")
+
+# Створення множин для зберігання значень прибутку та ризику
+returns, volatilities = [], []
+
+# Перебір різних значень цільової норми прибутку для побудови ефективної границі
+for target in np.linspace(0.1, 0.45, 50):
+    # Додаємо обмеження по цільовій нормі прибутку
+    constraints = (
+        {'type': 'eq', 'fun': lambda x: np.sum(x) - 1},
+        {'type': 'eq', 'fun': lambda x: portfolio_return(x) - target}
+    )
+    # Оптимізація для мінімального ризику при заданій нормі прибутку
+    result = opt.minimize(min_risk, [1/3, 1/3, 1/3], bounds=bounds, constraints=constraints)
+    if result.success:
+        returns.append(portfolio_return(result.x))
+        volatilities.append(portfolio_volatility(result.x))
+
+# Побудова графіку ефективної границі
+plt.plot(volatilities, returns, 'b--', label="Ефективна границя")
+plt.xlabel("Ризик (стандартне відхилення)")
+plt.ylabel("Очікувана норма прибутку")
+plt.title("Ефективна границя портфеля")
+plt.legend()
+plt.show()
